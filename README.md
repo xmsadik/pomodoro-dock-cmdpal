@@ -37,6 +37,8 @@ Windows **Focus Assist / Do Not Disturb** suppresses toasts like any other notif
 
 ## Installation
 
+Download `PomodoroDockDev.cer` and the `.msix` for your PC from the [Releases page](https://github.com/xmsadik/pomodoro-dock-cmdpal/releases).
+
 ### 1. Turn on the Dock
 
 1. Install or update [PowerToys](https://github.com/microsoft/PowerToys/releases) and make sure **Command Palette** is enabled in PowerToys Settings.
