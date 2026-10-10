@@ -1,0 +1,4 @@
+Portions of this project (Program.cs, PomodoroDockExtension.cs,
+Helpers/SettingsManager.cs, PomodoroDockCommandsProvider.cs, and the project
+scaffolding) are derived from the Microsoft PowerToys Command Palette extension
+template, Copyright (c) Microsoft Corporation, licensed under the MIT License.

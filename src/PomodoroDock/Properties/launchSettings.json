@@ -1,0 +1,11 @@
+{
+  "profiles": {
+    "PomodoroDock (Package)": {
+      "commandName": "MsixPackage",
+      "doNotLaunchApp": true
+    },
+    "PomodoroDock (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}
