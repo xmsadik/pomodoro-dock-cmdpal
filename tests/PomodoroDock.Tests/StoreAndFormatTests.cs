@@ -118,13 +118,13 @@ public class FormattingTests
     [Fact]
     public void Report_titles()
     {
-        Assert.Equal("🍅 3 pomodoros · 1h 15m focus", Formatting.TodayTitle(new DayStats(3, 4500, 2, 1)));
-        Assert.Equal("🍅 1 pomodoro · 25m focus", Formatting.TodayTitle(new DayStats(1, 1500, 0, 0)));
+        Assert.Equal("3 pomodoros · 1h 15m focus", Formatting.TodayTitle(new DayStats(3, 4500, 2, 1)));
+        Assert.Equal("1 pomodoro · 25m focus", Formatting.TodayTitle(new DayStats(1, 1500, 0, 0)));
         Assert.Equal("2 short breaks · 1 long break", Formatting.BreaksLine(new DayStats(3, 4500, 2, 1)));
         Assert.Equal("—", Formatting.BreaksLine(DayStats.Empty));
         Assert.Equal("Thu 9 Oct · 6 🍅 · 2h 30m", Formatting.DayTitle(new DateOnly(2025, 10, 9), new DayStats(6, 9000, 0, 0)));
         Assert.Equal("Wed 8 Oct · —", Formatting.DayTitle(new DateOnly(2025, 10, 8), DayStats.Empty));
-        Assert.Equal("Last 7 days · 23 🍅 · 9h 35m", Formatting.WeekTitle(7, new DayStats(23, 34500, 0, 0)));
+        Assert.Equal("23 pomodoros · 9h 35m focus", Formatting.WeekTitle(new DayStats(23, 34500, 0, 0)));
     }
 
     [Fact]
@@ -148,6 +148,45 @@ public class FormattingTests
         var longIdle = Snap(new TimerState { Phase = Phase.LongBreak });
         Assert.Equal("Ready · Long break", Formatting.Subtitle(longIdle));
         Assert.Equal("Start long break", Formatting.PrimaryActionTitle(longIdle));
+    }
+
+    [Fact]
+    public void Progress_bar_dots_and_hint()
+    {
+        var o = new PomodoroOptions();
+        var end = new DateTimeOffset(2026, 11, 18, 11, 35, 0, TimeSpan.Zero);
+        EngineSnapshot Snap(TimerState s, double remainingMin) =>
+            new(s, o, TimeSpan.FromMinutes(remainingMin), DateTimeOffset.UnixEpoch, new DateOnly(2026, 11, 18), DayStats.Empty);
+
+        var idle = Snap(new TimerState { CompletedInCycle = 1 }, 25);
+        Assert.Equal(0, Formatting.ProgressStep(idle));
+        Assert.Equal("▱▱▱▱▱▱▱▱▱▱  0%", Formatting.ProgressLine(idle));
+        Assert.Equal("●◉○○", Formatting.CycleDots(idle));
+        Assert.Equal("25 min", Formatting.PrimaryHint(idle, TimeZoneInfo.Utc));
+
+        // 10 of 25 minutes done -> 40%; the phase's own start length wins over the current setting.
+        var running = Snap(new TimerState { Status = RunStatus.Running, EndsAt = end, PhaseDuration = TimeSpan.FromMinutes(25), CompletedInCycle = 2 }, 15);
+        Assert.Equal("▰▰▰▰▱▱▱▱▱▱  40%", Formatting.ProgressLine(running));
+        Assert.Equal("●●◉○", Formatting.CycleDots(running));
+        Assert.Equal("Ends at 11:35", Formatting.PrimaryHint(running, TimeZoneInfo.Utc));
+
+        var paused = Snap(new TimerState { Phase = Phase.ShortBreak, Status = RunStatus.Paused, PhaseDuration = TimeSpan.FromMinutes(5), CompletedInCycle = 3 }, 0.5);
+        Assert.Equal(9, Formatting.ProgressStep(paused));
+        Assert.Equal("●●●○", Formatting.CycleDots(paused));
+        Assert.Equal("00:30 left", Formatting.PrimaryHint(paused, TimeZoneInfo.Utc));
+
+        var overrun = Snap(new TimerState { Phase = Phase.LongBreak, Status = RunStatus.Running, EndsAt = end, CompletedInCycle = 4 }, -1);
+        Assert.Equal("▰▰▰▰▰▰▰▰▰▰  100%", Formatting.ProgressLine(overrun));
+        Assert.Equal("●●●●", Formatting.CycleDots(overrun));
+        Assert.Equal("Long break", Formatting.PhaseTitle(Phase.LongBreak));
+    }
+
+    [Fact]
+    public void Sparkline_scales_to_the_best_day()
+    {
+        DayStats Focus(long s) => new(0, s, 0, 0);
+        Assert.Equal("▁▂█▅▁", Formatting.Sparkline([Focus(0), Focus(60), Focus(6000), Focus(3000), Focus(0)]));
+        Assert.Equal("▁▁▁", Formatting.Sparkline([Focus(0), Focus(0), Focus(0)]));
     }
 
     [Fact]

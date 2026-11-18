@@ -39,20 +39,24 @@ internal sealed partial class TimerCommand : InvokableCommand
 }
 
 /// <summary>
-/// The flyout opened from the Dock band: timer controls, today's totals and a last-7-days summary.
-/// The items are created once and their texts are mutated; <see cref="Refresh"/> is driven by the provider's
-/// signature check (single refresh path), so a per-second tick never reaches this page.
+/// The flyout opened from the Dock band. Top to bottom: a status row (phase, progress bar, status and cycle
+/// tags), the controls, today's totals, a last-7-days summary with a sparkline, and Settings. All icons are
+/// Segoe Fluent glyphs. The items are created once and their texts are mutated; <see cref="Refresh"/> is driven
+/// by the provider's signature check (single refresh path), so a per-second tick never reaches this page: the
+/// progress bar moves in tenths.
 /// </summary>
 internal sealed partial class TimerPage : ListPage
 {
     private readonly PomodoroEngine _engine;
     private readonly TimerCommand _toggle;
+    private readonly ListItem _status;
     private readonly ListItem _primary;
     private readonly ListItem _skip;
     private readonly ListItem _reset;
     private readonly ListItem _today;
     private readonly ListItem _week;
     private readonly IListItem[] _items;
+    private string _statusTagsKey = "";
 
     public TimerPage(PomodoroEngine engine, SettingsManager settings, EngineAction run)
     {
@@ -60,31 +64,34 @@ internal sealed partial class TimerPage : ListPage
         Id = "PomodoroDock.timer";
         Name = "Open";
         Title = "Pomodoro";
+        Icon = new IconInfo(Glyphs.Focus);
 
+        _status = new ListItem(new NoOpCommand()) { Section = "Now" };
         _toggle = new TimerCommand("PomodoroDock.toggle", "Start", run, e => e.StartOrToggle());
-        _primary = new ListItem(_toggle) { Section = "Timer", Icon = new IconInfo("▶️") };
+        _primary = new ListItem(_toggle) { Section = "Now", Icon = new IconInfo(Glyphs.Play) };
         _skip = new ListItem(new TimerCommand("PomodoroDock.skip", "Skip", run, e => e.Skip()))
         {
-            Section = "Timer",
-            Icon = new IconInfo("⏭️"),
+            Section = "Now",
+            Icon = new IconInfo(Glyphs.Skip),
         };
         _reset = new ListItem(new TimerCommand("PomodoroDock.reset", "Reset cycle", run, e => e.Reset()))
         {
             Title = "Reset cycle",
             Subtitle = "Back to the first focus session",
-            Section = "Timer",
-            Icon = new IconInfo("🔄"),
+            Section = "Now",
+            Icon = new IconInfo(Glyphs.Reset),
         };
-        _today = new ListItem(new NoOpCommand()) { Section = "Today" };
-        _week = new ListItem(new NoOpCommand()) { Section = "Last 7 days", Icon = new IconInfo("📅") };
+        _today = new ListItem(new NoOpCommand()) { Section = "Today", Icon = new IconInfo(Glyphs.Today) };
+        _week = new ListItem(new NoOpCommand()) { Section = "Last 7 days", Icon = new IconInfo(Glyphs.Week) };
         var settingsItem = new ListItem(settings.Settings.SettingsPage)
         {
             Title = "Settings",
+            Subtitle = "Durations, auto-start, notifications",
             Section = "Settings",
-            Icon = new IconInfo("⚙️"),
+            Icon = new IconInfo(Glyphs.Settings),
         };
 
-        _items = [_primary, _skip, _reset, _today, _week, settingsItem];
+        _items = [_status, _primary, _skip, _reset, _today, _week, settingsItem];
         Update();
     }
 
@@ -108,7 +115,8 @@ internal sealed partial class TimerPage : ListPage
     internal static string Signature(EngineSnapshot s, IReadOnlyList<DayEntry> days)
     {
         var sb = new System.Text.StringBuilder();
-        sb.Append(Formatting.PrimaryActionTitle(s)).Append('|').Append(Formatting.Subtitle(s)).Append('|')
+        sb.Append(s.Phase).Append('|').Append(s.Status).Append('|').Append(Formatting.CycleDots(s)).Append('|')
+            .Append(Formatting.ProgressStep(s)).Append('|').Append(Formatting.PrimaryHint(s, TimeZoneInfo.Local)).Append('|')
             .Append(s.SkipTarget).Append('|').Append(s.Today.DayNumber).Append('|').Append(s.TodayStats);
         foreach (var d in days)
         {
@@ -123,19 +131,58 @@ internal sealed partial class TimerPage : ListPage
         var s = _engine.Snapshot();
         var days = _engine.GetLastDays(7);
         var total = DayStats.Empty;
-        foreach (var d in days)
+        var oldestFirst = new DayStats[days.Count];
+        for (var i = 0; i < days.Count; i++)
         {
-            total += d.Stats;
+            total += days[i].Stats;
+            oldestFirst[days.Count - 1 - i] = days[i].Stats;
         }
 
+        // Status row: what is on, how far along, and where in the cycle.
+        SetText(_status, Formatting.PhaseTitle(s.Phase), Formatting.ProgressLine(s));
+        SetIcon(_status, Glyphs.ForPhase(s.Phase));
+        SetStatusTags(s);
+
         var primary = Formatting.PrimaryActionTitle(s);
-        var status = Formatting.Subtitle(s);
         SetCommandName(_toggle, primary);
-        SetText(_primary, primary, status);
-        SetIcon(_primary, s.Status == RunStatus.Running ? "⏸️" : "▶️");
+        SetText(_primary, primary, Formatting.PrimaryHint(s, TimeZoneInfo.Local));
+        SetIcon(_primary, s.Status == RunStatus.Running ? Glyphs.Pause : Glyphs.Play);
         SetText(_skip, "Skip to " + Formatting.PhaseName(s.SkipTarget), "Leave this phase without counting it");
         SetText(_today, Formatting.TodayTitle(s.TodayStats), Formatting.BreaksLine(s.TodayStats));
-        SetText(_week, Formatting.WeekTitle(days.Count, total), Formatting.BreaksLine(total));
+        SetText(_week, Formatting.WeekTitle(total), Formatting.Sparkline(oldestFirst) + "   " + Formatting.BreaksLine(total));
+    }
+
+    /// <summary>Two tags on the status row: the run status (filled with the phase color while running) and the cycle dots.</summary>
+    private void SetStatusTags(EngineSnapshot s)
+    {
+        var dots = Formatting.CycleDots(s);
+        var key = $"{s.Phase}|{s.Status}|{dots}";
+        if (key == _statusTagsKey)
+        {
+            return;
+        }
+
+        var accent = Glyphs.PhaseColor(s.Phase);
+        var statusTag = s.Status switch
+        {
+            RunStatus.Running => new Tag(Formatting.StatusName(s.Status))
+            {
+                Background = accent,
+                Foreground = Glyphs.White,
+            },
+            RunStatus.Paused => new Tag(Formatting.StatusName(s.Status)) { Foreground = accent },
+            _ => new Tag(Formatting.StatusName(s.Status)),
+        };
+
+        try
+        {
+            _status.Tags = [statusTag, new Tag(dots) { ToolTip = "Focus sessions in this cycle" }];
+            _statusTagsKey = key;
+        }
+        catch (Exception ex)
+        {
+            DiagLog.WriteLine($"TimerPage tags failed: {ex}");
+        }
     }
 
     // Each host-visible set is guarded and only done when the value changed (host bug #50483).

@@ -2,8 +2,8 @@
 
 A PowerToys Command Palette extension that puts a Pomodoro timer in the **Dock**.
 
-- **In the Dock:** a live clock with a phase icon, e.g. `🍅 18:42` (focus), `☕ 03:10` (short break), `🌴 12:00` (long break), `⏸️ 18:42` (paused). The subtitle shows the phase and your place in the cycle, e.g. `Focus · 2/4`.
-- **Click it:** a flyout with **Start / Pause / Resume**, **Skip to the next phase**, **Reset cycle**, today's totals (pomodoros, focus time, breaks), a **Last 7 days** summary, and **Settings**.
+- **In the Dock:** a live clock with a vector (Segoe Fluent) phase icon, like the built-in Dock bands: a target for focus, a cup for a short break, a sun for a long break, a pause sign when paused. The subtitle shows the phase and your place in the cycle, e.g. `Focus · 2/4`.
+- **Click it:** a flyout with a status row (phase, a progress bar such as `▰▰▰▰▱▱▱▱▱▱  40%` that moves in tenths, a colored *Running / Paused / Ready* tag and the cycle as dots, e.g. `●●◉○`), **Start / Pause / Resume** (with the end time, e.g. `Ends at 14:35`), **Skip to the next phase**, **Reset cycle**, today's totals (pomodoros, focus time, breaks), a **Last 7 days** summary with a per-day sparkline (`▁▃▅█▂▁▄`), and **Settings**.
 - **Notifications:** a Windows toast when a focus session or a break ends. The toast is scheduled with Windows when the phase starts, so it still appears if Command Palette is busy or the extension process was stopped.
 
 ## How the cycle works

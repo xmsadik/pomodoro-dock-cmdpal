@@ -20,14 +20,8 @@ internal sealed partial class PomodoroBand : ListItem
     {
     }
 
-    public static string IconFor(EngineSnapshot s) => s.Status == RunStatus.Paused
-        ? "⏸️"
-        : s.Phase switch
-        {
-            Phase.ShortBreak => "☕",
-            Phase.LongBreak => "🌴",
-            _ => "🍅",
-        };
+    /// <summary>A Segoe Fluent glyph, so the band matches the other (vector) Dock icons.</summary>
+    public static string IconFor(EngineSnapshot s) => s.Status == RunStatus.Paused ? Glyphs.Pause : Glyphs.ForPhase(s.Phase);
 
     public void Render(EngineSnapshot snapshot)
     {
